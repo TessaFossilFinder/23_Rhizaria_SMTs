@@ -20,12 +20,12 @@
 
 
 #First set up the work space:
-dir.create("~/Desktop/R_cleanup") #This makes a new folder on your desktop to keep things clean
-setwd("~/Desktop/R_cleanup") 
-#Move your fasta file in this folder
+### not run by TB ##dir.create("~/Desktop/R_cleanup") #This makes a new folder on your desktop to keep things clean
+setwd("~/Sandbox/23_Rhizaria_SMTs/R_Annotate") 
+# Move your fasta file in this folder
 
 #Write your file name in the quotes (including the .fasta)
-myFileName <- "my_file"
+myFileName <- "7_Rhizaria_trimV3.copy.fasta"
 # myFileName <- "filename.fasta"
 
 
@@ -39,7 +39,7 @@ myFileName <- "my_file"
 
 # Did you modify the file names from the original NCBI output?
 # 'Yes' changes the assumed sequence header to Accession|Species
-fastaCondition <- ("Yes") #Write 'Yes' or 'No'
+fastaCondition <- ("No") #Write 'Yes' or 'No'
 
 # Do you want the final sequence headers to be:
 # 'Option_1' Species|Phylum_Class|Metadata|Accession
@@ -201,7 +201,7 @@ print("Follow the instructions outlined below")
 #Paste contents of just_Genera.txt into this link (without changing any defaults):
 #https://www.ncbi.nlm.nih.gov/Taxonomy/TaxIdentifier/tax_identifier.cgi
 
-#Save the results as tax_report.txt in the desktop folder R_cleanup
+#Save the results as tax_report.txt in the folder R_Annotate
 #To save the file click 'Save in file' below the text box
 
 {
@@ -220,7 +220,7 @@ print("Follow the instructions outlined below")
 
 #Run the installation steps outlined here: https://www.ncbi.nlm.nih.gov/books/NBK179288/
 
-#Create a file called taxid_to_taxonomy_v1.sh in a text editor with this code and save it to ~/Desktop/R_cleanup/
+#Create a file called taxid_to_taxonomy_v1.sh in a text editor with this code and save it to ~/Sandbox/R_Annotate/
 #  efetch -db taxonomy -id MY_LIST -format xml | \
 #  xtract -pattern Taxon -first TaxId -element Taxon -block '*/Taxon'  \
 #  -unless Rank -equals 'no rank' -tab ',' -sep '_' -element Rank,ScientificName
@@ -242,7 +242,7 @@ print("Follow the instructions outlined below")
 }
 
 #Run the following in command line:
-#  cd ~/Desktop/R_cleanup/
+#  cd ~/Sandbox/R_Annotate/
 #  export PATH=${PATH}:${HOME}/edirect
 #  bash taxid_to_taxonomy_v2.sh > taxonomy_output.csv
 

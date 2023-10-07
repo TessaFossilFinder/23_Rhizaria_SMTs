@@ -405,7 +405,11 @@ trimal -in 6_Concatenated_maaft.fasta -gt 0.2 -out 7_Rhizaria_trimV3.fasta
 ## Desired format >[Accession #]|[Taxonomy_species][(|"OUTGROUP")](|"[No_X-terminal]")
 ################################################################################
 # use CM R code from seq.cleanup_plus_NCBI_V2.2.R
-
+# make a new directory and move seq.cleanup_plus_NCBI_V2.2.R and copy of 7_Rhizaria_trimV3.fasta into it
+mkdir R_Annotate
+mv 7_Rhizaria_trimV3.copy.fasta R_Annotate
+# run seq.cleanup_plus_NCBI_V2.2.R
+## looks fine enough! copy and moved 7_Rhizaria_trimV3_cleaned.fasta up a level and renamed to 7_Rhizaria_ann.fasta
 ################################################################################ 
 ############################
 ## BUILD TREE with IQTree ##
@@ -420,24 +424,18 @@ export PATH=/Users/brunoir/Desktop/Bioinformatics_Programs/iqtree-2.1.3-MacOSX/b
 ln -s /Users/brunoir/Desktop/Bioinformatics_Programs/iqtree-2.1.3-MacOSX/bin/iqtree2 iqtree
 
 # Automatically determine best fit substitution model and run iqtree with 1000 bootstraps
-iqtree -s 7_Rhizaria+_maaft.trimV3.fasta -nt AUTO -m LG+G4 -B 1000
-### welp I tossed this file but V2 should work?
-## iqtree would have appreciated more trimming?
-######### LOOK AT WITH DG ######################
-### moved tree files to folder 8_IQTrees, copied .contree file and renamed > 8_Rhizaria+.tree
-
+iqtree -s 7_Rhizaria_ann.fasta -nt AUTO -m LG+G4 -B 1000
+## several errors >> ERROR: Sequence XXX contains too many characters (XXX)
+### Annotation code appears to by bumping sequences out of alignment somehow
+### unannotate files should work with IQtree
+#### annotation is the problem rn
 #
 #
 #
 #
-################################################################################
-## Annotate taxonomic info to headers #
-## Desired format >[Accession #]|[Taxonomy_species][(|"OUTGROUP")](|"[No_X-terminal]")
-################################################################################
 #############################################
 # Label sequences without Sterol_MT_C domain
 #############################################
-
 ### WIP ######### NEED TO MAKE NEW CODE #######
 #
 #
