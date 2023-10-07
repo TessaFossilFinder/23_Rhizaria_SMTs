@@ -375,6 +375,7 @@ grep -c '^>' 6_Concatenated_Sequences.fasta
 #####################################
 # align 
 einsi 6_Concatenated_sequences.fasta > 6_Concatenated_maaft.fasta
+####### possible to eliminate alignments anywhere ??? ##########################
 
 ################################################################################
 #################################################
@@ -383,32 +384,27 @@ einsi 6_Concatenated_sequences.fasta > 6_Concatenated_maaft.fasta
 #################################################
 # Requires TrimAl (http://trimal.cgenomics.org/use_of_the_command_line_trimal_v1.2)
 
-trimal -in 6_Concatenated_maaft.fasta -gappyout -out 7_Rhizaria+_maaft.trim.fasta
+trimal -in 6_Concatenated_maaft.fasta -gappyout -out 7_Rhizaria_trim.fasta
 
 # count
-grep -c '^>' 7_Rhizaria+_maaft.trim.fasta
-## returns 960 sequences
-### sequences are VERY short, will trim un re-aligned sequences below
+grep -c '^>' 7_Rhizaria_trim.fasta
+## returns 1199 sequences
+### sequences are VERY short, need to adjust trimal parameters
 
-################################################################################
-trimal -in 6_Concatenated_sequences.fasta -gappyout -out 7_Rhizaria+_trim.fasta
-## recieving error: ERROR: The sequences in the input alignment should be aligned in order to use trimming method.
-### need to relax trimal parameters
-################################################################################
 # set gap threshold (-gt) to 0.5, columns with up to 50% gaps will be retained. 
-trimal -in 6_Concatenated_maaft.fasta -gt 0.5 -out 7_Rhizaria+_maaft.trimV2.fasta
+trimal -in 6_Concatenated_maaft.fasta -gt 0.5 -out 7_Rhizaria_trimV2.fasta
+
 # set gap threshold (-gt) to 0.2, columns with up to 20% gaps will be retained. 
-trimal -in 6_Concatenated_maaft.fasta -gt 0.5 -out 7_Rhizaria+_maaft.trimV3.fasta
-## retains most sequence information
+trimal -in 6_Concatenated_maaft.fasta -gt 0.2 -out 7_Rhizaria_trimV3.fasta
+## retains most sequence information, use this version for tree below
 ### build tree using this version
 
-
 ################################################################################
-## Annotate taxonomic info to headers #
+## ANNOTATE TAXONOMIC INFO to headers #
+#######################################
 ## Desired format >[Accession #]|[Taxonomy_species][(|"OUTGROUP")](|"[No_X-terminal]")
 ################################################################################
-python TaxAnn.py 7_Rhizaria+_maaft.trimV3.fasta 8_Rhizaria+annV2.fasta
-###### ^^^ DOES NOT WORK ^^^^ ##########
+# use CM R code from seq.cleanup_plus_NCBI_V2.2.R
 
 ################################################################################ 
 ############################
@@ -438,19 +434,6 @@ iqtree -s 7_Rhizaria+_maaft.trimV3.fasta -nt AUTO -m LG+G4 -B 1000
 ## Annotate taxonomic info to headers #
 ## Desired format >[Accession #]|[Taxonomy_species][(|"OUTGROUP")](|"[No_X-terminal]")
 ################################################################################
-
-
-################################################################################
-# attempt Chris's R for annotating sequences
-seq.cleanup_plus_NCBI_V2.1.R
-## saved as 8_Rhizaria+ann.fasta
-iqtree -s 8_Rhizaria+ann.fasta -nt AUTO -m LG+G4 -B 1000
-## annotation worked well but IQtree wouldnt work with it
-### recieved the following errors: ERROR: Sequence APP88317.1|Eukaryota_Sar_Rhizaria_Cercozoa_Imbricatea_Silicofilosea_Euglyphida_Paulinellidae_Paulinella_micropora contains too many characters (94)
-################################################################################
-
-
-################################################################################
 #############################################
 # Label sequences without Sterol_MT_C domain
 #############################################
@@ -466,50 +449,6 @@ iqtree -s 8_Rhizaria+ann.fasta -nt AUTO -m LG+G4 -B 1000
 #
 ###############################################################################
 ################################################################################
-############################ WIP BELOW HERE ###################################
-##########################################
-###### BUILD WHOLE PROTEIN TREE ##########
-##########################################
-##########################################
-# Extract Entire SMT protein #
-##############################
-
-################################
-# Extract Methyltransf domain #
-################################
-grep '.* Methyltransf_\d* *' 3_Rhizaria+_pfam.txt > tmp1
-# use squeeze flag (-s) in tr to replace all white spaces with a tab
-tr -s ' ' \\t < tmp1 > tmp2
-
-###############################
-# Extract Sterol_MT_C domain #
-###############################
-grep '.* Sterol_MT_C *' 3_Rhizaria+_pfam.txt > tmp3
-# use squeeze flag (-s) in tr to replace all white spaces with a tab
-tr -s ' ' \\t < tmp3 > tmp4
-
-# Combine Methyltransf and Sterol_MT_C domains with the sequences in between
-cat tmp2 2_Rhizaria+_cd.fasta tmp4 > 4_SMT_full.txt
-
-# Cleanup
-rm tmp*
-
-#################################
-## ALIGN SEQUENCES using MAFFT ##
-#################################
-#################################
-# Requires MAFFT (https://mafft.cbrc.jp/alignment/software/)
-
-# align full length SMT protein 
-einsi 4_SMT_full.fasta > 5_SMT_maaft.fasta
-
-#################################################
-## CLEAN up poorly aligned regions with trimAl ##
-#################################################
-#################################################
-# Requires TrimAl (http://trimal.cgenomics.org/use_of_the_command_line_trimal_v1.2)
-
-trimal -in 5_SMT_Gene_maaft.fasta -gappyout -out 6_SMTGene_trim.fasta
 
 
 
