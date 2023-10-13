@@ -40,7 +40,7 @@ TransDecoder.Predict -t 0_Rhizaria_TSA.edit.fasta
 
 ################################################################################
 ################################################################
-## BLAST NCBI non-redundant protein database (nr) using blatp ##
+## BLAST NCBI non-redundant protein database (nr) using blas(?)tp ##
 ################################################################
 ################################################################
 # for ERG6 protein sequence: 0_smtquery.txt limited to SAR supergroup (taxid:2698737)
@@ -203,10 +203,16 @@ rm -r Pfam
 ## EXTRACTING conserved domains w/ SAMTOOLS ##
 ##############################################
 ##############################################
-###############################
-# Extract Methyltransf domain #
-###############################
-grep '.* Methyltransf_\d* *' 3_Rhizaria_pfam.txt > tmp1
+################################ 1) Pull out only Methyltransf_11 #################
+################################ 2) or combine Methyltransf_11 and CMAS ###########
+################################ need to annotate which trees don't contain Domains
+### concatinate CMAS and Methyltransf and then run through cd-hit ## maybe preferabled
+
+#########################################
+# Extract Methyltransf and CMAS domains #
+#########################################
+
+grep '.* Methyltransf_\d *' 3_Rhizaria_pfam.txt > tmp1
 # use squeeze flag (-s) in tr to replace all white spaces with a tab
 tr -s ' ' \\t < tmp1 > tmp2
 # extract envelope coordinates
@@ -228,6 +234,80 @@ rm tmp*
 grep -c '^>' 4_Methyltransf_Domains.fasta
 ## returns 1104 domains
 
+grep '.* CMAS *' 3_Rhizaria_pfam.txt > tmp1
+# use squeeze flag (-s) in tr to replace all white spaces with a tab
+tr -s ' ' \\t < tmp1 > tmp2
+# extract envelope coordinates
+awk -v OFS='\t' '{print $1,$4,$5}' tmp2 > tmp3
+# Concatenate domains broken into multiple fragments 
+awk -F'\t' -v OFS='\t' '{x=$1;$1="";a[x]=a[x]$0}END{for(x in a)print x,a[x]}' tmp3 > tmp4
+tr -s '\t' \\t < tmp4 > tmp5
+# Extract name, first envelope coordinate, last envelope coordinate
+awk -v OFS='\t' '{print "\047"$1"\047"":"$2"-"$NF}' tmp5 > tmp6
+# Extract domains with samtools
+xargs samtools faidx --length 100000000 2_Rhizaria_cd.fasta < tmp6 > 4_CMAS.fasta
+# remove domain coordinates from sequence identifiers
+sed 's/:.*$//' 4_CMAS.fasta > 4_CMAS.clean.fasta
+
+# Cleanup
+rm tmp*
+
+# Count
+grep -c '^>' 4_CMAS.fasta
+## returns 90 domains
+
+################################################################################
+## CONCATENATE Methyltransf & CMAS sequences and removed duplicates w/ CD-HIT ##
+################################################################################
+
+cat 4_Methyltransf_Domains.clean.fasta 4_CMAS.clean.fasta > 4_All_Methytransf.fasta
+
+#####################################################
+# Breakup all sequences into individual fasta files #
+#####################################################
+# create temp directory 
+mkdir temp
+cd temp
+
+# search for lines starting with '>', replace with the same content followed by a tab character. Content is then redirected to a file named tmp1.
+gsed s/"\(>\)\(.*\)"/"\1\2\t"/g ../4_All_Methytransf.fasta > tmp1
+# Removes all newline characters, and saves the modified content to a file named tmp2
+tr -d '\n' < tmp1 > tmp2
+sed 's/>\([^\n]*\)/\n>\1/g' tmp2 > tmp3
+gsed 's/>/\n>/g' tmp2 > tmp3
+# Add tab character before the first "|" symbol in each line, and sort the content of tmp3
+## Modified from DG code
+sort tmp3 | gsed -E 's/^([^|]*)|/\1\t/' > 4_All_Methyltransf.txt
+
+# split into files by ID
+awk -F'\t' '!_[$1]++ { fn && close(fn)
+fn = $1 ".tmp"
+}
+{ print > fn } ' 4_All_Methyltransf.txt
+
+
+# reformat into fasta
+for i in *.tmp; do
+	gsed -E 's/^([^\t]*)\t/\1/;s/\t([^\t]*)$/\n\1/' $i > ${i%.tmp}.fasta;
+done
+
+#################
+## run CD-Hit  ##
+#################
+for i in *.fasta; do
+	cd-hit -i $i -o ${i%.fasta}.cd-hit.txt -d 100 -c 0.90;
+done
+
+# concatenate individuals cd-hit files back together
+cat *.cd-hit.txt > ../4_All_Methyltransf_cd.fasta
+
+# Count
+grep -c '^>' ../4_All_Methyltransf_cd.fasta
+## Returns 107 sequences
+
+cd ../
+# remove temp directory
+rm -r temp
 
 ##############################
 # Extract Sterol_MT_C domain #
@@ -254,36 +334,6 @@ rm tmp*
 
 ## returns 397 domains
 
-##############################
-# Extract CMAS domain #
-##############################
-grep '.* CMAS *' 3_Rhizaria_pfam.txt > tmp1
-# use squeeze flag (-s) in tr to replace all white spaces with a tab
-tr -s ' ' \\t < tmp1 > tmp2
-# extract envelope coordinates
-awk -v OFS='\t' '{print $1,$4,$5}' tmp2 > tmp3
-# Concatenate domains broken into multiple fragments 
-awk -F'\t' -v OFS='\t' '{x=$1;$1="";a[x]=a[x]$0}END{for(x in a)print x,a[x]}' tmp3 > tmp4
-tr -s '\t' \\t < tmp4 > tmp5
-# Extract name, first envelope coordinate, last envelope coordinate
-awk -v OFS='\t' '{print "\047"$1"\047"":"$2"-"$NF}' tmp5 > tmp6
-# Extract domains with samtools
-xargs samtools faidx --length 100000000 2_Rhizaria_cd.fasta < tmp6 > 4_CMAS.fasta
-# Remove domain coordinates from sequence identifiers
-sed 's/:.*$//' 4_CMAS.fasta > 4_CMAS.clean.fasta
-
-# Cleanup
-rm tmp*
-
-# Count
-grep -c '^>' 4_CMAS.fasta
-## returns 90 domains
-
-################ Extract other domains??? ####################################
-# push to github
-git remote add origin https://github.com/TessaFossilFinder/23_Rhizaria_SMTs.git
-git branch -M main
-git push -u origin main
 
 ################################################################################
 #################################
@@ -292,29 +342,22 @@ git push -u origin main
 #################################
 # Requires MAFFT (https://mafft.cbrc.jp/alignment/software/)
 
-# align 'Methtranf' domain
-einsi 4_Methyltransf_Domains.clean.fasta > 5_Methyltransf_Domains_maaft.fasta
+# align file containing all methyltransferase domain
+einsi 4_All_Methyltransf_cd.fasta > 5_Methyltransf_Domains_maaft.fasta
 # Count
 grep -c '^>' 5_Methyltransf_Domains_maaft.fasta
-## returns 877 >> no loss
+## returns 107 >> no loss
 
 # alignt 'Sterol_MT_C' domain
 einsi 4_Sterol_MT_C.clean.fasta > 5_Sterol_MT_C_maaft.fasta
 # Count
 grep -c '^>' 5_Sterol_MT_C_maaft.fasta
-## returns 337 >> no loss
+## returns 397 >> no loss
 
-# alignt 'CMAS' domain
-einsi 4_CMAS.clean.fasta > 5_CMAS_maaft.fasta
-
-git remote add origin https://github.com/TessaFossilFinder/23_Rhizaria_SMTs.git
-# Sets the new remote
-git remote -v
-# Verifies the new remote URL
 ###################################
 # CONCATENATE seperate alignments #
 ###################################
-# Concatenate sequences into a single sequence entry in the output file nased on sequence ID. If the sequence IDs are different, it will keep both sequences separately.
+# Concatenate sequences into a single sequence entry in the output file nased on sequence ID. If the sequence IDs are different, it will keep both sequences separately
 ## this code was edited to not remove sequences missing a domain
 
 # call Python
@@ -345,37 +388,28 @@ def write_fasta_file(file_path, sequences):
             file.write('>' + sequence_id + '\n')
             file.write(sequence + '\n')
 
-def concatenate_sequences(fasta_file1, fasta_file2, fasta_file3, output_file):
+def concatenate_sequences(fasta_file1, fasta_file2, output_file):
     sequences1 = read_fasta_file(fasta_file1)
     sequences2 = read_fasta_file(fasta_file2)
-    sequences3 = read_fasta_file(fasta_file3)
     
     # Combine sequences from both files into a new dictionary
-    concatenated_sequences = {**sequences1, **sequences2, **sequences3}
+    concatenated_sequences = {**sequences1, **sequences2}
     
     # Write the concatenated sequences to a new FASTA file
     write_fasta_file(output_file, concatenated_sequences)
 
-# Usageq
+# Usage
 fasta_file1 = '5_Methyltransf_Domains_maaft.fasta'
 fasta_file2 = '5_Sterol_MT_C_maaft.fasta'
-fasta_file3 = '5_CMAS_maaft.fasta'
 output_file = '6_Concatenated_Sequences.fasta'
 
-concatenate_sequences(fasta_file1, fasta_file2, fasta_file3, output_file)
+concatenate_sequences(fasta_file1, fasta_file2, output_file)
 
 quit()
 
 # count
 grep -c '^>' 6_Concatenated_Sequences.fasta
-## returns 960 sequences
-
-#####################################
-# Re-align newly stitched sequences #
-#####################################
-# align 
-einsi 6_Concatenated_sequences.fasta > 6_Concatenated_maaft.fasta
-####### possible to eliminate alignments anywhere ??? ##########################
+## returns 468 sequences
 
 ################################################################################
 #################################################
@@ -384,13 +418,50 @@ einsi 6_Concatenated_sequences.fasta > 6_Concatenated_maaft.fasta
 #################################################
 # Requires TrimAl (http://trimal.cgenomics.org/use_of_the_command_line_trimal_v1.2)
 
-trimal -in 6_Concatenated_maaft.fasta -gappyout -out 7_Rhizaria_trim.fasta
+trimal -in 6_Concatenated_Sequences.fasta -gappyout -out 7_Rhizaria_trim.fasta
+## ERROR: The sequences in the input alignment should be aligned in order to use trimming method.
+################################################################################ 
+################################################################################
+# _______ _________ _        _______ 
+#(  ____ )\__   __/( (    /|(  ____ \
+#| (    )|   ) (   |  \  ( || (    \/
+#| (____)|   | |   |   \ | || |      
+#|  _____)   | |   | (\ \) || | ____ 
+#| (         | |   | | \   || | \_  )
+#| )      ___) (___| )  \  || (___) |
+#|/       \_______/|/    )_)(_______)
+# ______   _______          _________ ______  
+#(  __  \ (  ___  )|\     /|\__   __/(  __  \ 
+#| (  \  )| (   ) || )   ( |   ) (   | (  \  )
+#| |   ) || (___) || |   | |   | |   | |   ) |
+#| |   | ||  ___  |( (   ) )   | |   | |   | |
+#| |   ) || (   ) | \ \_/ /    | |   | |   ) |
+#| (__/  )| )   ( |  \   /  ___) (___| (__/  )
+#(______/ |/     \|   \_/   \_______/(______/ 
+# _______  _______  _        ______  
+#(  ____ \(  ___  )( \      (  __  \ 
+#| (    \/| (   ) || (      | (  \  )
+#| |      | |   | || |      | |   ) |
+#| | ____ | |   | || |      | |   | |
+#| | \_  )| |   | || |      | |   ) |
+#| (___) || (___) || (____/\| (__/  )
+#(_______)(_______)(_______/(______/ 
+################################################################################                     
+################################################################################ 
 
 # count
 grep -c '^>' 7_Rhizaria_trim.fasta
-## returns 1199 sequences
-### sequences are VERY short, need to adjust trimal parameters
+## returns 
 
+#
+#
+#
+#
+#
+#
+#
+#
+################################## STOPPED #####################################
 # set gap threshold (-gt) to 0.5, columns with up to 50% gaps will be retained. 
 trimal -in 6_Concatenated_maaft.fasta -gt 0.5 -out 7_Rhizaria_trimV2.fasta
 
@@ -409,7 +480,56 @@ trimal -in 6_Concatenated_maaft.fasta -gt 0.2 -out 7_Rhizaria_trimV3.fasta
 mkdir R_Annotate
 mv 7_Rhizaria_trimV3.copy.fasta R_Annotate
 # run seq.cleanup_plus_NCBI_V2.2.R
-## looks fine enough! copy and moved 7_Rhizaria_trimV3_cleaned.fasta up a level and renamed to 7_Rhizaria_ann.fasta
+## copy and moved 7_Rhizaria_trimV3_cleaned.fasta up a level and renamed to 7_Rhizaria_ann.fasta
+#
+#
+#
+#
+####################
+# In Command Line..
+# Download NCBI E- utilites
+sh -c "$(curl -fsSL https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)"
+sh -c "$(wget -q https://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh -O -)"
+echo "export PATH=\$HOME/edirect:\$PATH" >> $HOME/.bash_profile
+# set path to E-utilities
+export PATH=${HOME}/edirect:${PATH}
+
+# extract and print second column to tmp1 file
+awk -F"|" '/^>/{print $2}' 7_Rhizaria_trimV3.copy.fasta > tmp1
+# remove protein model numbers (".p[#]")
+sed 's/\.p[0-9]*$//' tmp1 > tmp2
+#ensure unix style new line at end of each accession
+tr -d '\r' < tmp2
+# remove duplicates save the unique accession numbers to tmp3
+sort -u tmp2 > tmp3
+## step maybe not necesssary jsut seing if it helps next step. not necessary if using epost
+# collect taxids from NCBI
+cat tmp3 | epost -db protein | esummary | xtract -pattern DocumentSummary -element Caption,TaxId > tmp4
+## worked the best so far! returned 1027 taxids
+# format
+awk -F'\t' '{print $2"\t"$1}' tmp4 > tmp4_temp && mv tmp4_temp tmp4
+
+
+###############################################################################
+
+# Extract Genus
+sed -n 's/^>\([^_]*\).*/\1/p' 7_Rhizaria_trimV3.copy.fasta > tmpA
+# count unique genera
+sort tmpA | uniq | wc -l
+## returns 344
+
+
+
+
+
+cat tmpA | epost -db protein | esummary -db protein | xtract -pattern DocumentSummary -element Caption,TaxId > tmpB
+
+
+
+
+
+
+
 ################################################################################ 
 ############################
 ## BUILD TREE with IQTree ##
@@ -429,7 +549,8 @@ iqtree -s 7_Rhizaria_ann.fasta -nt AUTO -m LG+G4 -B 1000
 ### Annotation code appears to by bumping sequences out of alignment somehow
 ### unannotate files should work with IQtree
 #### annotation is the problem rn
-#
+
+
 #
 #
 #
